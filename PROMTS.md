@@ -10,7 +10,7 @@ The Request must have the following fields:
 - `phone` (required)
 - `address` (required)
 - `problem_text` (required)
-- `status` (enum): `new | assigned | in_progress | done | cancelled`
+- `status` (enum): `new|assigned|in_progress|done|cancelled`
 - `assigned_to` (Model User (role `master`), ManyToOne relation nullable)
 - `created_at`, `updated_at`
 
@@ -74,6 +74,36 @@ Write migration create_requests_table too pls
       4. Write race_test.sh
 
 
-4. [2026-03-17 15:34] Write requests/index
+4. [2026-03-17 15:34] 
+Write requests/index
  - blade.php, 
  - create.php
+
+
+5. [2026-03-17 17:12]
+write AssignMasterRequest
+6. [2026-03-17 18:20] 
+
+only dispatcher can cancel request,  create CancelRequestRequest
+
+6. [2026-03-17 19:08] 
+
+only user with role master can take request in work, request->assigned must be current master, request->status=='assigned',  create TakeInWorkRequestRequest
+
+7. [2026-03-17 19:58]
+
+only user with role master can done request, request->assigned must be current master, request->status=='in_progress',  create DoneRequestRequest
+
+8. [2026-03-17 20:20]
+
+write phpunit tests for \App\Services\RequestService (code of service goes there...)
+9. [2026-03-17 21:03]
+
+ write phpunit tests for \App\Http\Controllers\RequestController (code of controller goes there...)
+10. [2026-03-17 21:30]
+
+write DECISIONS.md file with explanations: where and why certain architectural or technical decisions were made, why certain libraries were chosen, and a description of the implementation features.
+
+11. [2026-03-17 22:27]
+
+convert the script `race_test.sh`  to Console Command - ParallelCheckCommand

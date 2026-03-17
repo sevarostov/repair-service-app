@@ -2,74 +2,125 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ApiError;
+use App\Http\Requests\AssignMasterRequest;
+use App\Http\Requests\CancelRequestRequest;
+use App\Http\Requests\DoneRequestRequest;
+use App\Http\Requests\TakeRequestRequest;
 use App\Models\Request;
 use App\Http\Requests\StoreRequestRequest;
+use App\Repositories\RequestRepository;
+use App\Services\RequestService;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request as IlluminateRequest;
-use Illuminate\Support\Facades\DB;
 
 class RequestController extends Controller
 {
-	public function index(IlluminateRequest $request)
+	public function __construct(
+		public readonly RequestRepository $requestRepository,
+		public RequestService $requestService,
+	) {}
+
+	/**
+	 * Список
+	 *
+	 * @param IlluminateRequest $request
+	 *
+	 * @return View
+	 */
+	public function index(IlluminateRequest $request): View
 	{
-		$user = auth()->user();
-		$query = Request::query();
-
-		if ($user->hasRole('master')) {
-			$query->where('assigned_to', $user->id);
-		}
-
-		if (!empty($request->has('status')) && $request->status) {
-			$query->where('status', $request->status);
-		}
-
-		$requests = $query->paginate(10);
-		return view('requests.index', compact('requests'));
+		return view('requests.index', [
+			'requests' => $this->requestRepository->getListBy($request)
+		]);
 	}
 
-	public function create()
+	/**
+	 * Создать
+	 * @return View
+	 */
+	public function create(): View
 	{
 		return view('requests.create');
 	}
 
-	public function store(StoreRequestRequest $request)
+	/**
+	 * Сохранить
+	 *
+	 * @param StoreRequestRequest $request
+	 *
+	 * @return RedirectResponse
+	 */
+	public function store(StoreRequestRequest $request): RedirectResponse
 	{
-		Request::create($request->validated());
-		return redirect()->route('requests.index')->with('success', 'Request created successfully');
+		if ($this->requestService->create($request->validated())) {
+			return redirect()->route('requests.index')->with('success', ApiError::NoError->getDescription());
+		}
+		return redirect()->route('requests.index')->with('error', ApiError::RuntimeError->getDescription());
 	}
 
-	public function assign(IlluminateRequest $request, $id)
+	/**
+	 * Назначить мастера
+	 *
+	 * @param AssignMasterRequest $request
+	 * @param int $id Request ID
+	 *
+	 * @return RedirectResponse
+	 */
+	public function assign(AssignMasterRequest $request, int $id): RedirectResponse
 	{
-		$req = Request::findOrFail($id);
-		$req->update([
-			'assigned_to' => $request->master_id,
-			'status' => 'assigned'
-		]);
-		return redirect()->back()->with('success', 'Master assigned');
+		if ($this->requestService->assign($request, $id)) {
+			return redirect()->route('requests.index')->with('success', ApiError::NoError->getDescription());
+		}
+		return redirect()->route('requests.index')->with('error', ApiError::RuntimeError->getDescription());
 	}
 
-	public function takeIntoWork($id)
+	/**
+	 * Отменить
+	 *
+	 * @param CancelRequestRequest $request
+	 * @param int $id Request ID
+	 *
+	 * @return RedirectResponse
+	 */
+	public function cancel(CancelRequestRequest $request, int $id): RedirectResponse
 	{
-		$result = DB::transaction(function () use ($id) {
-			$request = Request::where('id', $id)
-				->where('status', 'assigned')
-				->lockForUpdate()
-				->first();
-
-			if (!$request) {
-				return response('', 409);
-			}
-
-			$request->update(['status' => 'in_progress']);
-			return response('', 200);
-		});
-
-		return $result;
+		if ($this->requestService->updateStatus($request->validated(), $id, Request::STATUS_CANCELLED)) {
+			return redirect()->route('requests.index')->with('success', ApiError::NoError->getDescription());
+		}
+		return redirect()->route('requests.index')->with('error', ApiError::RuntimeError->getDescription());
 	}
 
-	public function statusUpdate($id)
+	/**
+	 * Взять в работу
+	 *
+	 * @param TakeRequestRequest $request
+	 * @param $id
+	 *
+	 * @return RedirectResponse
+	 */
+	public function take(TakeRequestRequest $request, $id): RedirectResponse
 	{
-		$request = Request::findOrFail($id);
-		$request->update(['status' => 'done']);
-		return redirect()->back()->with('success', 'Request completed');
+		if ($this->requestService->updateStatus($request->validated(), $id, Request::STATUS_IN_PROGRESS, lock: true)) {
+			return redirect()->route('requests.index')->with('success', ApiError::NoError->getDescription());
+		}
+		return redirect()->route('requests.index')->with('error', ApiError::RuntimeError->getDescription());
+	}
+
+	/**
+	 * Завершить
+	 *
+	 * @param DoneRequestRequest $request
+	 * @param $id
+	 *
+	 * @return RedirectResponse
+	 */
+	public function done(DoneRequestRequest $request, $id): RedirectResponse
+	{
+		if ($this->requestService->updateStatus($request->validated(), $id, Request::STATUS_DONE)) {
+			return redirect()->route('requests.index')->with('success', ApiError::NoError->getDescription());
+		}
+		return redirect()->route('requests.index')->with('error', ApiError::RuntimeError->getDescription());
 	}
 }

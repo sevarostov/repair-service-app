@@ -6,30 +6,33 @@
 			<div class="col-12">
 				<h1>Заявки в ремонтную службу</h1>
 				
-				<!-- Фильтры -->
-				<div class="card mb-4">
-					<div class="card-body">
-						<form method="GET" action="{{ route('requests.index') }}">
-							<div class="row">
-								<div class="col-md-4">
-									<label for="status" class="form-label">Статус</label>
-									<select name="status" id="status" class="form-select">
-										<option value="">Все статусы</option>
-										@foreach(App\Models\Request::getStatuses() as $key => $label)
-											<option value="{{ $key }}" {{ request('status') == $key ? 'selected' : '' }}>
-												{{ $label }}
-											</option>
-										@endforeach
-									</select>
+				@if(auth()->user()->hasRole('dispatcher'))
+					<!-- Фильтры -->
+					<div class="card mb-4">
+						<div class="card-body">
+							<form method="GET" action="{{ route('requests.index') }}">
+								<div class="row">
+									<div class="col-md-4">
+										<label for="status" class="form-label">Статус</label>
+										<select name="status" id="status" class="form-select">
+											<option value="">Все статусы</option>
+											@foreach(App\Models\Request::getStatuses() as $key => $label)
+												<option value="{{ $key }}" {{ request('status') == $key ? 'selected' : '' }}>
+													{{ $label }}
+												</option>
+											@endforeach
+										</select>
+									</div>
+									<div class="col-md-8 d-flex align-items-end">
+										<button type="submit" class="btn btn-primary me-2">Применить</button>
+										<a href="{{ route('requests.index') }}" class="btn btn-secondary">Сбросить</a>
+									</div>
 								</div>
-								<div class="col-md-8 d-flex align-items-end">
-									<button type="submit" class="btn btn-primary me-2">Применить</button>
-									<a href="{{ route('requests.index') }}" class="btn btn-secondary">Сбросить</a>
-								</div>
-							</div>
-						</form>
+							</form>
+						</div>
 					</div>
-				</div>
+				@endif
+				
 				
 				<!-- Сообщения -->
 				@if(session('success'))
@@ -74,34 +77,15 @@
 										<td>{{ $request->address }}</td>
 										<td>{{ Str::limit($request->problem_text, 50) }}</td>
 										<td>
-                <span class="badge @switch($request->status)
-								    @case(App\Models\Request::STATUS_NEW)
-								        'bg-primary'
-								        @break
-								 
-								    @case(App\Models\Request::STATUS_ASSIGNED)
-								        'bg-warning text-dark'
-								        @break
-								    
-								    @case(App\Models\Request::STATUS_IN_PROGRESS)
-								        'bg-info'
-								        @break
-								        
-								    @case(App\Models\Request::STATUS_DONE)
-								        'bg-danger'
-								        @break
-								 
-								    @default
-								        {{ App\Models\Request::getStatusLabel($request->status) }}
-								@endswitch">
-								                    {{ App\Models\Request::getStatusLabel($request->status) }}
-                </span>
+							                <span class="badge {{$request->getBadgeColor()}}">
+												{{ App\Models\Request::getStatusLabel($request->status) }}
+							                </span>
 										</td>
 										
 										@if(auth()->user()->hasRole('dispatcher'))
 											<td>
-												@if($request->master)
-													{{ $request->master->name }}
+												@if($request->assigned)
+													{{ $request->assigned->name }}
 												@else
 													<span class="text-muted">Не назначен</span>
 												@endif
@@ -111,7 +95,7 @@
 										<td>
 											<!-- Действия для диспетчера -->
 											@if(auth()->user()->hasRole('dispatcher'))
-												@if($request->status === 'new')
+												@if($request->status === \App\Models\Request::STATUS_NEW)
 													<!-- Форма назначения мастера -->
 													<form method="POST"
 													      action="{{ route('requests.assign', $request->id) }}"
@@ -127,35 +111,43 @@
 															Назначить
 														</button>
 													</form>
-												@elseif($request->status !== 'done' && $request->status !== 'cancelled')
+												@elseif($request->status !== \App\Models\Request::STATUS_DONE && $request->status !== \App\Models\Request::STATUS_CANCELLED)
 													<a href="#" class="btn btn-sm btn-outline-danger"
 													   onclick="event.preventDefault();
-                     document.getElementById('cancel-form-{{ $request->id }}').submit();">
+                                                        document.getElementById('cancel-form-{{ $request->id }}').submit();">
 														Отменить
 													</a>
 													<form id="cancel-form-{{ $request->id }}"
-													      action="{{ route('requests.statusUpdate', $request->id) }}"
-													      method="POST" style="display: none;">
+													      action="{{ route('requests.cancel', $request->id) }}"
+													      style="display: none;"
+													>
 														@csrf
 														@method('PATCH')
 													</form>
 												@endif
 											@elseif(auth()->user()->hasRole('master'))
 												<!-- Действия для мастера -->
-												@if($request->status === 'assigned')
+												@if($request->status === \App\Models\Request::STATUS_ASSIGNED)
+													<a href="#" class="btn btn-sm btn-primary"
+													   onclick="event.preventDefault();
+                                                        document.getElementById('assign-form-{{ $request->id }}').submit();">
+														Взять в работу
+													</a>
 													<form method="POST"
-													      action="{{ route('requests.statusUpdate', $request->id) }}"
-													      class="d-inline">
+													      id="assign-form-{{ $request->id }}"
+													      action="{{ route('requests.take', $request->id) }}"
+													      class="d-inline"
+													>
 														@csrf
-														<button type="submit" class="btn btn-sm btn-primary">Взять в
-															работу
-														</button>
+														@method('PATCH')
 													</form>
-												@elseif($request->status === 'in_progress')
+												@elseif($request->status === \App\Models\Request::STATUS_IN_PROGRESS)
 													<form method="POST"
-													      action="{{ route('requests.statusUpdate', $request->id) }}"
-													      class="d-inline">
+													      action="{{ route('requests.done', $request->id) }}"
+													      class="d-inline"
+													>
 														@csrf
+														@method('PATCH')
 														<button type="submit" class="btn btn-sm btn-success">Завершить
 														</button>
 													</form>

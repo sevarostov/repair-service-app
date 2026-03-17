@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $phone
  * @property string $address
  * @property string $problem_text
- * @property string $status Статус  (например: new)
+ * @property string $status Статус  (enum: `new|assigned|in_progress|done|cancelled`)
  * @property int|null $assigned_to
  * @property Carbon|null $created_at Дата создания записи
  * @property Carbon|null $updated_at Дата последнего обновления записи
@@ -57,7 +57,7 @@ class Request extends Model
 			self::STATUS_ASSIGNED => 'Назначен мастер',
 			self::STATUS_IN_PROGRESS => 'В работе',
 			self::STATUS_DONE => 'Выполнен',
-			self::STATUS_CANCELLED => 'Отменён',
+			self::STATUS_CANCELLED => 'Отменена',
 		];
 	}
 
@@ -79,5 +79,22 @@ class Request extends Model
 	public function assigned(): BelongsTo
 	{
 		return $this->belongsTo(User::class, 'assigned_to');
+	}
+
+	/**
+	 * Получить CSS‑классы для бейджа статуса (для Bootstrap)
+	 *
+	 * @return string
+	 */
+	public function getBadgeColor(): string
+	{
+		return match ($this->status) {
+			self::STATUS_NEW => 'bg-primary',
+			self::STATUS_ASSIGNED => 'bg-warning text-dark',
+			self::STATUS_IN_PROGRESS => 'bg-info',
+			self::STATUS_DONE => 'bg-success', // исправлено: было bg-danger, должно быть bg-success для «Выполнен»
+			self::STATUS_CANCELLED => 'bg-danger',
+			default => 'bg-secondary' // резервный вариант для неизвестных статусов
+		};
 	}
 }

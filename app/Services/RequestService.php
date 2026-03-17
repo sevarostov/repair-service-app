@@ -2,12 +2,12 @@
 
 namespace App\Services;
 
-use App\Enums\Role;
-use App\Models\Request;
-use App\Models\User;
+use App\Enums\ApiError;
+use App\Exceptions\UserException;
+use App\Http\Requests\AssignMasterRequest;
+use App\Models\Request as Request;
 use App\Repositories\RequestRepository;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * Сервис работы с заявками
@@ -15,101 +15,75 @@ use Illuminate\Support\Str;
  */
 class RequestService
 {
-	public function __construct(
-		private RequestRepository $repository,
-	) {}
+	public function __construct(public RequestRepository $repository) {}
 
 	/**
 	 * Создать новую
 	 *
 	 * @param array $data
 	 *
-	 * @return Request
+	 * @return bool
 	 */
-	public function createRequest(array $data): Request
+	public function create(array $data): bool
 	{
-		$request = Request::create($data);
-		$request->save();
-		return $request;
+		return (!!Request::create($data)) > 0;
 	}
 
 	/**
 	 * Назначить мастера
 	 *
-	 * @param Request $request
-	 * @param User $master
+	 * @param AssignMasterRequest $request
+	 * @param int $id Request ID
 	 *
 	 * @return bool
 	 */
-	public function assignMaster(Request $request, User $master): bool
+	public function assign(AssignMasterRequest $request, int $id): bool
 	{
-		if (!$master->hasRole(Role::MASTER)) {
-			return false;
-		}
-
-		return Request::where('id', $request->id)->update([
-				'assigned_to' => $master->id,
+		return Request::where('id', $id)->update([
+				'assigned_to' => $request->master_id,
 				'status' => Request::STATUS_ASSIGNED
 			]) > 0;
 	}
 
 	/**
-	 * Взять  в работу (с защитой от гонки)
+	 * Обновить статус заявки
 	 *
-	 * @param Request $request
-	 *
-	 * @return bool
-	 */
-	public function takeIntoWork(Request $request): bool
-	{
-		return DB::transaction(function () use ($request) {
-			$request = Request::where('id', $request->id)->lockForUpdate()->first();
-
-			if (!$request || $request->status !== Request::STATUS_ASSIGNED) {
-				return false;
-			}
-
-			return $this->updateStatus($request, Request::STATUS_IN_PROGRESS);
-		});
-	}
-
-	/**
-	 * Завершить выполнение
-	 *
-	 * @param Request $request
-	 *
-	 * @return bool
-	 */
-	public function complete(Request $request): bool
-	{
-		return $this->updateStatus($request, Request::STATUS_DONE);
-	}
-
-	/**
-	 * Отменить
-	 *
-	 * @param Request $request
-	 *
-	 * @return bool
-	 */
-	public function cancel(Request $request): bool
-	{
-		return $this->updateStatus($request, Request::STATUS_CANCELLED);
-	}
-
-	/**
-	 * Обновить статус запроса
-	 *
-	 * @param Request $request
+	 * @param array $data
+	 * @param int $requestId
 	 * @param string $status
+	 * @param ?bool $lock Необходимость блокировки запроса (защита от параллельных запросов)
 	 *
-	 * @return bool
+	 * @return bool|UserException
 	 */
-	public function updateStatus(Request $request, string $status): bool
+	public function updateStatus(array $data, int $requestId, string $status, bool $lock = false): bool|UserException
 	{
 		if (!in_array($status, array_keys(Request::getStatuses()))) {
 			return false;
 		}
-		return Request::where('id', $request->id)->update(['status' => $status]) > 0;
+
+		if ($lock === true) {
+			$result = DB::transaction(function () use ($requestId, $status) {
+
+				$request = Request::where('id', $requestId)
+					->lockForUpdate()
+					->first();
+
+				if ($request->status === Request::STATUS_IN_PROGRESS) {
+					throw new UserException(
+						ApiError::Conflict,
+						ApiError::Conflict->getDescription(),
+						ApiError::Conflict->value,
+					);
+				}
+
+				$request
+					->update(['status' => $status]);
+			});
+		} else {
+			$result = Request::where('id', $requestId)
+				->update(['status' => $status]);
+		}
+
+		return $result === null || $result > 0;
 	}
 }

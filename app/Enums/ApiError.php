@@ -24,6 +24,8 @@ enum ApiError: int
 
 	case Forbidden = 403;
 	case Conflict = 409;
+	case StatusInvalid = 1;
+	case AssignmentMismatch = 2;
 
 	/**
 	 * Получить описание ошибки
@@ -33,10 +35,12 @@ enum ApiError: int
 	public function getDescription(): string
 	{
 		return match ($this) {
-			self::NoError => "",
+			self::NoError => "Успешно",
 			self::RuntimeError => "Произошла ошибка. Пожалуйста, попробуйте позже или свяжитесь с Службой поддержки",
-			self::Forbidden => "Недостаточно прав для совершения действия",
+			self::Forbidden => "Только пользователь с ролью 'мастер' может взять заявку в работу",
 			self::Conflict => "Заявка уже взята в работу",
+			self::StatusInvalid => 'Заявка должна иметь статус "Назначен мастер" для взятия в работу',
+			self::AssignmentMismatch => 'Можно взять в работу только назначенную вам заявку',
 		};
 	}
 }

@@ -18,5 +18,7 @@ Route::middleware(['auth', EnsureUserHasRole::class . ':dispatcher|master'])->gr
 	Route::get('/requests/create', [RequestController::class, 'create'])->name('requests.create');
 	Route::post('/requests', [RequestController::class, 'store'])->name('requests.store');
 	Route::post('/requests/{id}/assign', [RequestController::class, 'assign'])->name('requests.assign');
-	Route::post('/requests/{id}/status/update', [RequestController::class, 'complete'])->name('requests.statusUpdate');
+	Route::patch('/requests/{id}/cancel', [RequestController::class, 'cancel'])->name('requests.cancel');
+	Route::patch('/requests/{id}/take', [RequestController::class, 'take'])->name('requests.take');
+	Route::patch('/requests/{id}/done', [RequestController::class, 'done'])->name('requests.done');
 });
