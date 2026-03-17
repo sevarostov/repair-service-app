@@ -74,11 +74,15 @@ Has role `master`
 
 
 ## Secured area (needs login with credentials above):
+[GET /login] login page
 [GET /home] free access to all authorized users (roles no matter)
-[GET /request] request list with filters and operations with requests (granted access for role `dispatcher|master`)
-[GET /request/new] request creation (granted access for role `dispatcher`)
-[GET /request/{id}/assign] assign request to master (granted access for role `dispatcher`)
-[GET /request/{id}/status/update] update status of request (e.g. `new`->`cancelled`, granted access for role `dispatcher|master` each role has its own permissions)
+[GET|HEAD  requests] RequestController@index request list with filters and operations with requests (granted access for role `dispatcher|master`)
+[POST      requests] RequestController@store (granted access for role `dispatcher|master`)
+[GET|HEAD  requests/create] request creation (granted access for role `dispatcher|master`)
+[POST      requests/{id}/assign] assign a User to Request and update status of request (e.g. `new`->`assigned`, granted access for role `dispatcher`)
+[PATCH     requests/{id}/cancel] update status of request (e.g. `new`->`cancelled`, granted access for role `dispatcher`)
+[PATCH     requests/{id}/take] update status of request (e.g. `assigned`->`in_progress`, granted access for role `master`)
+[PATCH     requests/{id}/done] update status of request (e.g. `in_progress`->`done`, granted access for role `master`)
 
 ## Run tests
 
