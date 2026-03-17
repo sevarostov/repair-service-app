@@ -74,6 +74,6 @@ Write migration create_requests_table too pls
       4. Write race_test.sh
 
 
-4. Write requests/index
+4. [2026-03-17 15:34] Write requests/index
  - blade.php, 
  - create.php
